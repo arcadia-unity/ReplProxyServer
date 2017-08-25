@@ -3,13 +3,16 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Collections.Concurrent;
+
+using Mono.Unix;
 
 /***
  * 
  * [ host (clojure socket repl) ] <---> [ local (PassThroughReplServer) ] <--->  [ client (editor/user) ]
  * 
  */
-namespace PassThroughReplServer
+namespace ReplProxyServer
 {
     class Server
     {
@@ -44,11 +47,16 @@ namespace PassThroughReplServer
             return bytesRead;
         }
 
+        ConcurrentBag<Socket> sockets;
+
+        bool running = true;
+
         public Server(int localPort, string localAddress = "127.0.0.1", int hostPort = 5555, string hostAddress = "127.0.0.1")
         {
             localListener = new TcpListener(GetAddress(localAddress), localPort);
             this.hostAddress = hostAddress;
             this.hostPort = hostPort;
+            this.sockets = new ConcurrentBag<Socket>();
         }
 
         /// <summary>
@@ -93,11 +101,12 @@ namespace PassThroughReplServer
         /// <param name="clientConnection">New client connection</param>
         public void AcceptConnection(TcpClient clientConnection)
         {
+            sockets.Add(clientConnection.Client);
             Console.WriteLine("New client " + clientConnection.Client.LocalEndPoint);
             TcpClient hostClient = new TcpClient();
             new Thread(() =>
             {
-                while (clientConnection.Connected)
+                while (running && clientConnection.Connected)
                 {
                     if (!hostClient.Connected)
                     {
@@ -107,6 +116,7 @@ namespace PassThroughReplServer
                             hostClient = new TcpClient();
                             hostClient.Connect(GetAddress(hostAddress), hostPort);
                             Console.WriteLine("OK");
+                            sockets.Add(hostClient.Client);
                             PipeClients(hostClient, clientConnection);
                             PipeClients(clientConnection, hostClient);
                         }
@@ -134,7 +144,7 @@ namespace PassThroughReplServer
                 Console.Write("Listening on " + localListener.LocalEndpoint + "... ");
                 localListener.Start();
                 Console.WriteLine("OK");
-                while (true)
+                while (running)
                 {
                     AcceptConnection(localListener.AcceptTcpClient());
                 }
@@ -146,13 +156,29 @@ namespace PassThroughReplServer
                 return;
             }
         }
+
+        public void Terminate()
+        {
+                running = false;
+            foreach(var socket in sockets)
+            {
+                var b = new byte[1];
+                if(socket.Connected)
+                {
+					socket.Shutdown(SocketShutdown.Both);
+					//while(socket.Receive(b) == 0) { Thread.Sleep(10); }
+					socket.Close();
+
+				}
+            }
+        }
     }
 
     class Program
     {
         public static void Usage()
         {
-            Console.WriteLine("PassThroughReplServer HOSTADDR HOSTPORT [LOCALHOST [LOCALPORT]]");
+            Console.WriteLine("ReplProxyServer HOSTADDR HOSTPORT [LOCALHOST [LOCALPORT]]");
             Environment.Exit(0);
         }
 
@@ -180,7 +206,25 @@ namespace PassThroughReplServer
                     break;
             }
 
-            var server = new Server(localPort, localAddress, hostPort, hostAddress);
+			var server = new Server(localPort, localAddress, hostPort, hostAddress);
+			
+			var signals = new UnixSignal[] {
+                new UnixSignal(Mono.Unix.Native.Signum.SIGINT),
+                new UnixSignal(Mono.Unix.Native.Signum.SIGUSR1)
+            };
+
+			new Thread(() =>
+			{
+				while (true)
+				{
+					int index = UnixSignal.WaitAny(signals);
+					Console.WriteLine(index);
+                    server.Terminate();
+					Console.WriteLine("See you!");
+					Environment.Exit(0);
+				}
+			}).Start();
+
             server.Listen();
         }
     }

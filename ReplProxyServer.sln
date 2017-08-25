@@ -1,7 +1,7 @@
 
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PassThroughReplServer", "PassThroughReplServer.csproj", "{1BFEDA53-5585-42F9-9FC5-F8890FB24335}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReplProxyServer", "ReplProxyServer.csproj", "{1BFEDA53-5585-42F9-9FC5-F8890FB24335}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

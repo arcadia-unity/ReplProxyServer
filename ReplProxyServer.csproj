@@ -5,8 +5,8 @@
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
     <ProjectGuid>{1BFEDA53-5585-42F9-9FC5-F8890FB24335}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>PassThroughReplServer</RootNamespace>
-    <AssemblyName>PassThroughReplServer</AssemblyName>
+    <RootNamespace>ReplProxyServer</RootNamespace>
+    <AssemblyName>ReplProxyServer</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
@@ -30,6 +30,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="Mono.Posix" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
