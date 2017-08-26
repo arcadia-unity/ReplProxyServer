@@ -5,8 +5,6 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Collections.Concurrent;
 
-using Mono.Unix;
-
 /***
  * 
  * [ host (clojure socket repl) ] <---> [ local (PassThroughReplServer) ] <--->  [ client (editor/user) ]
@@ -30,15 +28,15 @@ namespace ReplProxyServer
             return null;
         }
 
-		/// <summary>
-		/// Reads from input and writes to output. Blocks.
-		/// 
-		/// Modified from https://stackoverflow.com/questions/129305/how-to-write-the-content-of-one-stream-into-another-stream-in-net
-		/// </summary>
-		/// <returns>The number of bytes copied.</returns>
-		/// <param name="input">Input stream</param>
-		/// <param name="output">Output stream</param>
-		static int CopyStream(Stream input, Stream output)
+        /// <summary>
+        /// Reads from input and writes to output. Blocks.
+        /// 
+        /// Modified from https://stackoverflow.com/questions/129305/how-to-write-the-content-of-one-stream-into-another-stream-in-net
+        /// </summary>
+        /// <returns>The number of bytes copied.</returns>
+        /// <param name="input">Input stream</param>
+        /// <param name="output">Output stream</param>
+        static int CopyStream(Stream input, Stream output)
         {
             byte[] buffer = new byte[BUFFER_SIZE];
             int bytesRead;
@@ -144,6 +142,7 @@ namespace ReplProxyServer
                 Console.Write("Listening on " + localListener.LocalEndpoint + "... ");
                 localListener.Start();
                 Console.WriteLine("OK");
+                Console.WriteLine("Press Q to quit gracefully");
                 while (running)
                 {
                     AcceptConnection(localListener.AcceptTcpClient());
@@ -153,23 +152,25 @@ namespace ReplProxyServer
             {
                 Console.WriteLine(ex.Message);
                 Console.WriteLine("Quitting");
+                Terminate();
+                Environment.Exit(1);
                 return;
             }
         }
 
         public void Terminate()
         {
-                running = false;
-            foreach(var socket in sockets)
+            running = false;
+            foreach (var socket in sockets)
             {
                 var b = new byte[1];
-                if(socket.Connected)
+                if (socket.Connected)
                 {
-					socket.Shutdown(SocketShutdown.Both);
-					//while(socket.Receive(b) == 0) { Thread.Sleep(10); }
-					socket.Close();
+                    socket.Shutdown(SocketShutdown.Both);
+                    //while(socket.Receive(b) == 0) { Thread.Sleep(10); }
+                    socket.Close();
 
-				}
+                }
             }
         }
     }
@@ -206,24 +207,21 @@ namespace ReplProxyServer
                     break;
             }
 
-			var server = new Server(localPort, localAddress, hostPort, hostAddress);
-			
-			var signals = new UnixSignal[] {
-                new UnixSignal(Mono.Unix.Native.Signum.SIGINT),
-                new UnixSignal(Mono.Unix.Native.Signum.SIGUSR1)
-            };
+            var server = new Server(localPort, localAddress, hostPort, hostAddress);
 
-			new Thread(() =>
-			{
-				while (true)
-				{
-					int index = UnixSignal.WaitAny(signals);
-					Console.WriteLine(index);
-                    server.Terminate();
-					Console.WriteLine("See you!");
-					Environment.Exit(0);
-				}
-			}).Start();
+            new Thread(() =>
+            {
+                while (true)
+                {
+                    if (Console.ReadKey().Key == ConsoleKey.Q)
+                    {
+                        server.Terminate();
+                        Console.Clear();
+                        Console.WriteLine("See You!");
+                        Environment.Exit(0);
+                    }
+                }
+            }).Start();
 
             server.Listen();
         }
